@@ -444,7 +444,10 @@
     data = data.sort(function(a, b){ return a.timestamp - b.timestamp; });
     this.bySid    = {};
     this.series   = [];
+    //console.log('conf', config);
     this.config   = (config || {});
+    //console.log('this conf', this.config);
+    this.selector = (this.config.selector || '#timeline_setter');
     this.bounds   = new Bounds();
     this.bar      = new Bar(this);
     this.cardCont = new CardScroller(this);
@@ -494,18 +497,18 @@
   // scenes `Bar` handles the moving and zooming behaviours through the `draggable`
   // and `wheel` plugins.
   var Bar = function(timeline) {
-    this.el = $(".TS-notchbar");
-    this.el.css({ "left": 0 });
     this.timeline = timeline;
+    this.el = $(this.timeline.selector + " .TS-notchbar");
+    this.el.css({ "left": 0 });
     draggable(this);
     wheel(this);
     _.bindAll(this, "moving", "doZoom");
     this.el.bind("dragging scrolled", this.moving);
     this.el.bind("doZoom", this.doZoom);
-    this.template = template("#TS-year_notch_tmpl");
+    this.template = template(this.timeline.selector + " .TS-year_notch_tmpl");
     this.el.bind("dblclick doubletap", function(e){
       e.preventDefault();
-      $(".TS-zoom_in").click();
+      $(this.timeline.selector + " .TS-zoom_in").click();
     });
   };
   observable(Bar.prototype);
@@ -538,7 +541,7 @@
     // bar to correct for this behaviour, and in future versions we'll fix this.
     doZoom : function(e, width){
       var that = this;
-      var notch = $(".TS-notch_active");
+      var notch = $(this.timeline.selector + " .TS-notch_active");
       var getCur = function() {
         return notch.length > 0 ? notch.position().left : 0;
       };
@@ -575,7 +578,7 @@
   // The `CardScroller` mirrors the moving and zooming of the `Bar` and is the
   // canvas where individual cards are rendered.
   var CardScroller = function(timeline){
-    this.el = $("#TS-card_scroller_inner");
+    this.el = $(timeline.selector + " .TS-card_scroller_inner");
   };
   observable(CardScroller.prototype);
   transformable(CardScroller.prototype);
@@ -588,7 +591,7 @@
     this.color    = this.name.length > 0 ? color() : "default";
     this.cards    = [];
     _.bindAll(this, "render", "showNotches", "hideNotches");
-    this.template = template("#TS-series_legend_tmpl");
+    this.template = template(this.timeline.selector + " .TS-series_legend_tmpl");
     this.timeline.bind(this.render);
   };
   observable(Series.prototype);
@@ -625,7 +628,7 @@
       if (!e.type === "render") return;
       if (this.name.length === 0) return;
       this.el = $(this.template(this));
-      $(".TS-series_nav_container").append(this.el);
+      $(this.timeline.selector + " .TS-series_nav_container").append(this.el);
       this.el.toggle(this.hideNotches, this.showNotches);
     }
   });
@@ -647,8 +650,8 @@
     this.attributes = card;
     this.attributes.topcolor = series.color;
 
-    this.template = template("#TS-card_tmpl");
-    this.ntemplate = template("#TS-notch_tmpl");
+    this.template = template(this.series.timeline.selector + " .TS-card_tmpl");
+    this.ntemplate = template(this.series.timeline.selector + " .TS-notch_tmpl");
     _.bindAll(this, "render", "activate", "flip", "setPermalink", "toggleNotch");
     this.series.bind(this.toggleNotch);
     this.series.timeline.bind(this.render);
@@ -678,7 +681,7 @@
       this.offset = this.series.timeline.bounds.project(this.timestamp, 100);
       var html = this.ntemplate(this.attributes);
       this.notch = $(html).css({"left": this.offset + "%"});
-      $(".TS-notchbar").append(this.notch);
+      $(this.series.timeline.selector + " .TS-notchbar").append(this.notch);
       this.notch.click(this.activate);
       if (history.get() === this.id) this.activate();
     },
@@ -689,9 +692,9 @@
     flip : function(e) {
       if (e.type !== "move" || !this.el || !this.el.is(":visible")) return;
       var rightEdge   = this.$(".TS-item").offset().left + this.$(".TS-item").width();
-      var tRightEdge  = $("#timeline_setter").offset().left + $("#timeline_setter").width();
+      var tRightEdge  = $(this.series.timeline.selector).offset().left + $(this.series.timeline.selector).width();
       var margin      = this.el.css("margin-left") === this.originalMargin;
-      var flippable   = this.$(".TS-item").width() < $("#timeline_setter").width() / 2;
+      var flippable   = this.$(".TS-item").width() < $(this.series.timeline.selector).width() / 2;
       var offTimeline = this.el.position().left - this.$(".TS-item").width() < 0;
 
       // If the card's right edge is more than the timeline's right edge and 
@@ -703,7 +706,7 @@
         // Otherwise, if the card is off the left side of the timeline and we have
         // flipped it before and the card's width is less than half of the width
         // of the whole timeline, we'll flip it to the default position.
-      } else if (this.el.offset().left - $("#timeline_setter").offset().left < 0 && !margin && flippable) {
+      } else if (this.el.offset().left - $(this.series.timeline.selector).offset().left < 0 && !margin && flippable) {
         this.el.css({"margin-left": this.originalMargin});
         this.$(".TS-css_arrow").css({"left": 0});
       }
@@ -718,9 +721,9 @@
       if (!this.el) {
         this.el = $(this.template({card: this}));
         this.el.css({"left": this.offset + "%"});
-        $("#TS-card_scroller_inner").append(this.el);
+        $(this.series.timeline.selector + " .TS-card_scroller_inner").append(this.el);
         this.originalMargin = this.el.css("margin-left");
-        this.el.delegate(".TS-permalink", "click", this.setPermalink);
+        this.el.delegate(this.series.timeline.selector + " .TS-permalink", "click", this.setPermalink);
         // Reactivate if there are images in the html so we can recalculate
         // widths and position accordingly.
         this.$("img").load(this.activate);
@@ -754,12 +757,12 @@
     move : function() {
       var e = $.Event('moving');
       var offset  = this.$(".TS-item").offset();
-      var toffset = $("#timeline_setter").offset();
+      var toffset = $(this.series.timeline.selector).offset();
       if (offset.left < toffset.left) {
         e.deltaX = toffset.left - offset.left + cleanNumber(this.$(".TS-item").css("padding-left"));
         this.series.timeline.bar.moving(e);
-      } else if (offset.left + this.$(".TS-item").outerWidth() > toffset.left + $("#timeline_setter").width()) {
-        e.deltaX = toffset.left + $("#timeline_setter").width() - (offset.left + this.$(".TS-item").outerWidth());
+      } else if (offset.left + this.$(".TS-item").outerWidth() > toffset.left + $(this.series.timeline.selector).width()) {
+        e.deltaX = toffset.left + $(this.series.timeline.selector).width() - (offset.left + this.$(".TS-item").outerWidth());
         this.series.timeline.bar.moving(e);
       }
     },
@@ -771,8 +774,8 @@
 
     // Globally hide any cards with `TS-card_active`.
     hideActiveCard : function() {
-      $(".TS-card_active").removeClass("TS-card_active").hide();
-      $(".TS-notch_active").removeClass("TS-notch_active");
+      $(this.series.timeline.selector + " .TS-card_active").removeClass("TS-card_active").hide();
+      $(this.series.timeline.selector + " .TS-notch_active").removeClass("TS-notch_active");
     },
 
     // An event listener to toggle this notche on and off via `Series`.
@@ -811,20 +814,22 @@
 
   // Each `Zoom` control adjusts the `curZoom` when clicked.
   var curZoom = 100;
-  var Zoom = function(direction) {
+  var Zoom = function(direction, timeline) {
+    this.timeline = timeline;
+    this.prefix = this.timeline.selector + " .TS-zoom_";
     Control.apply(this, arguments);
   };
   inherits(Zoom, Control);
 
   Zoom.prototype = _.extend(Zoom.prototype, {
-    prefix : ".TS-zoom_",
+    //prefix : this.timeline.selector + " .TS-zoom_",
 
     // Adjust the `curZoom` up or down by 100 and trigger a `doZoom` event on
     // `.TS-notchbar`
     click : function() {
       curZoom += (this.direction === "in" ? +100 : -100);
       if (curZoom >= 100) {
-        $(".TS-notchbar").trigger('doZoom', [curZoom]);
+        $(this.timeline.selector + " .TS-notchbar").trigger('doZoom', [curZoom]);
       } else {
         curZoom = 100;
       }
@@ -833,14 +838,31 @@
 
 
   // Each `Chooser` activates the next or previous notch.
-  var Chooser = function(direction) {
+  var Chooser = function(direction, timeline) {
+    this.timeline = timeline;
+    this.prefix = this.timeline.selector + " .TS-choose_";
     Control.apply(this, arguments);
-    this.notches = $(".TS-notch");
+    this.notches = $(this.timeline.selector + " .TS-notch");
+    this.click = function(e) {
+      var el;
+      var activeNotches    = this.notches.not(".TS-series_inactive");
+      var curCardIdx = activeNotches.index($(this.timeline.selector + " .TS-notch_active"));
+      console.log(curCardIdx);
+      var numOfCards = activeNotches.length;
+      if (this.direction === "next") {
+        el = (curCardIdx < numOfCards ? activeNotches.eq(curCardIdx + 1) : false);
+      } else {
+        el = (curCardIdx > 0 ? activeNotches.eq(curCardIdx - 1) : false);
+      }
+      if (!el) return;
+      el.trigger("click");
+      console.log('clicked for ' + this.timeline.selector);
+    };
   };
   inherits(Chooser, Control);
-
+	/*
   Chooser.prototype = _.extend(Control.prototype, {
-    prefix: ".TS-choose_",
+    //prefix: ".TS-choose_",
 
     // Figure out which notch to activate and do so by triggering a click on
     // that notch.
@@ -858,7 +880,7 @@
       el.trigger("click");
     }
   });
-
+*/
 
   // Finally, let's create the whole timeline. Boot is exposed globally via
   // `TimelineSetter.Timeline.boot()` which takes the JSON generated by
@@ -871,15 +893,28 @@
   // and binding to `"keydown"`.
   Timeline.boot = function(data, config) {
     $(function(){
+	  //console.log('boot data:', data);
+      //console.log('boot config:', config);
+      config = (config || {});
+      config.selector = (config.selector || '#timeline_setter');
+      TimelineSetter.timeline = new Timeline(data, config);
+      new Zoom("in", TimelineSetter.timeline);
+      new Zoom("out", TimelineSetter.timeline);
+      var chooseNext = new Chooser("next", TimelineSetter.timeline);
+      var choosePrev = new Chooser("prev", TimelineSetter.timeline);
+      
+      //test
+      $(config.selector + " .TS-card_active").removeClass("TS-card_active").hide();
+      $(config.selector + " .TS-notch_active").removeClass("TS-notch_active");
+      
+      if (!$(config.selector + " .TS-card_active").is("*")) chooseNext.click();
+      
+      //test
+	  var notches = $(config.selector + " .TS-notch");
+      var curCardIdx = notches.index($(config.selector + " .TS-notch_active"));
+      console.log('initCardIdx: ' + curCardIdx);
 
-      TimelineSetter.timeline = new Timeline(data, config || {});
-      new Zoom("in");
-      new Zoom("out");
-      var chooseNext = new Chooser("next");
-      var choosePrev = new Chooser("prev");
-      if (!$(".TS-card_active").is("*")) chooseNext.click();
-
-      $(document).bind('keydown', function(e) {
+      /*$(document).bind('keydown', function(e) {
         if (e.keyCode === 39) {
           chooseNext.click();
         } else if (e.keyCode === 37) {
@@ -887,7 +922,8 @@
         } else {
           return;
         }
-      });
+      });*/
+      
     });
 
   };
